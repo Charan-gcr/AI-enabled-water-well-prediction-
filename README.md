@@ -1,7 +1,7 @@
 # AI-enabled-water-well-prediction-
 
-Inspiration
-
+ Inspiration
+ 
 The inspiration behind the AI-Enabled Water Well Prediction System is to address the critical issue of water scarcity in rural villages, towns, and cities.
 
 Access to clean and reliable groundwater sources is essential for agriculture, drinking water supply, and industrial activities.

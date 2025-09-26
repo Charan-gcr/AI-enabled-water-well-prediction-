@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Water Well Predictor — Demo</title>
+
+  <!-- Bootstrap CSS (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    body { background:#f7fafc; }
+    #map { height: 420px; border-radius: 6px; }
+    .card { border-radius: 10px; box-shadow: 0 6px 18px rgba(11,15,30,0.06); }
+    .small-muted { font-size:0.85rem; color:#6b7280; }
+    .required::after { content:" *"; color:#dc2626; }
+    pre.json { white-space: pre-wrap; word-wrap: break-word; background:#0f172a; color:#e6eef8; padding:10px; border-radius:6px; font-size:0.9rem; }
+  </style>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">AI Water Well Predictor — Demo</h3>
+    <small class="text-muted">Click map to pick location → fill form → Predict</small>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card p-3 mb-3">
+        <div id="map"></div>
+        <div class="mt-2 small-muted">Tip: click on the map to set a location. Coordinates populate below.</div>
+      </div>
+
+      <div class="card p-3">
+        <h6>Selected Point</h6>
+        <div class="row gx-2 gy-2">
+          <div class="col-md-6">
+            <label class="form-label">Latitude</label>
+            <input id="lat" class="form-control" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Longitude</label>
+            <input id="lon" class="form-control" readonly>
+          </div>
+        </div>
+        <hr/>
+        <h6>Site Features</h6>
+        <form id="predict-form" class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label required">Soil type</label>
+            <select id="soil_type" class="form-select">
+              <option value="sandy">sandy</option>
+              <option value="clay">clay</option>
+              <option value="loam">loam</option>
+              <option value="silt">silt</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label required">Lithology</label>
+            <select id="lithology" class="form-select">
+              <option value="granite">granite</option>
+              <option value="basalt">basalt</option>
+              <option value="limestone">limestone</option>
+              <option value="shale">shale</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label required">Land use</label>
+            <select id="land_use" class="form-select">
+              <option value="agriculture">agriculture</option>
+              <option value="forest">forest</option>
+              <option value="urban">urban</option>
+              <option value="grassland">grassland</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Rainfall (mm)</label>
+            <input id="rainfall_mm" type="number" step="any" class="form-control" value="800">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Slope (deg)</label>
+            <input id="slope_deg" type="number" step="any" class="form-control" value="5.0">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Elevation (m)</label>
+            <input id="elevation_m" type="number" step="any" class="form-control" value="400">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Water table (m)</label>
+            <input id="water_table_m" type="number" step="any" class="form-control" placeholder="depth to water (if known)">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Distance to river (km)</label>
+            <input id="distance_to_river_km" type="number" step="any" class="form-control" value="2.0">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">NDVI (0-1)</label>
+            <input id="ndvi" type="number" step="any" class="form-control" value="0.4" min="0" max="1">
+          </div>
+
+          <div class="col-12 mt-2 d-flex gap-2">
+            <button id="btn-predict" type="button" class="btn btn-primary">Predict</button>
+            <button id="btn-reset" type="button" class="btn btn-outline-secondary">Reset</button>
+            <div class="ms-auto small-muted align-self-center">API endpoint: <code id="api-endpoint">http://127.0.0.1:8000/predict</code></div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card p-3 mb-3">
+        <h5 class="mb-2">Prediction Result</h5>
+        <div id="result-area">
+          <p class="small-muted">No prediction yet.</p>
+        </div>
+      </div>
+
+      <div class="card p-3">
+        <h6>Raw Response</h6>
+        <pre id="raw" class="json">—</pre>
+        <hr/>
+        <h6>How to use</h6>
+        <ol class="small-muted">
+          <li>Start your backend API (Flask) and allow CORS.</li>
+          <li>If backend is remote, change the API URL in the script below.</li>
+          <li>Click map → set fields → Predict → view results.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Bootstrap JS (bundle) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // Default API endpoint (change if deploying)
+  const API_URL = "http://127.0.0.1:8000/predict";
+
+  document.getElementById("api-endpoint").textContent = API_URL;
+
+  // Initialize map
+  const map = L.map('map').setView([20.5937,78.9629], 5); // India view by default
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  let marker = null;
+  map.on('click', function(e) {
+    const { lat, lng } = e.latlng;
+    if (marker) marker.setLatLng(e.latlng);
+    else marker = L.marker(e.latlng).addTo(map);
+
+    document.getElementById("lat").value = lat.toFixed(6);
+    document.getElementById("lon").value = lng.toFixed(6);
+  });
+
+  // Reset button
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    document.getElementById("predict-form").reset();
+    if (marker) { map.removeLayer(marker); marker = null; }
+    document.getElementById("lat").value = "";
+    document.getElementById("lon").value = "";
+    document.getElementById("result-area").innerHTML = '<p class="small-muted">No prediction yet.</p>';
+    document.getElementById("raw").textContent = "—";
+  });
+
+  // Predict button
+  document.getElementById("btn-predict").addEventListener("click", async () => {
+    const lat = document.getElementById("lat").value;
+    const lon = document.getElementById("lon").value;
+    if (!lat || !lon) {
+      alert("Please pick a location on the map first.");
+      return;
+    }
+
+    // Build payload (fields used by your backend; add/remove as needed)
+    const payload = {
+      soil_type: document.getElementById("soil_type").value,
+      lithology: document.getElementById("lithology").value,
+      land_use: document.getElementById("land_use").value,
+      rainfall_mm: Number(document.getElementById("rainfall_mm").value || 0),
+      slope_deg: Number(document.getElementById("slope_deg").value || 0),
+      elevation_m: Number(document.getElementById("elevation_m").value || 0),
+      water_table_m: document.getElementById("water_table_m").value ? Number(document.getElementById("water_table_m").value) : null,
+      distance_to_river_km: Number(document.getElementById("distance_to_river_km").value || 0),
+      ndvi: Number(document.getElementById("ndvi").value || 0),
+      latitude: Number(lat),
+      longitude: Number(lon)
+    };
+
+    // Send POST to API
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Server returned ${res.status}: ${txt}`);
+      }
+
+      const data = await res.json();
+      // Display results
+      const prob = (data.suitable_probability !== undefined) ? Number(data.suitable_probability) : null;
+      const cls = (data.suitable !== undefined) ? data.suitable : null;
+      const depth = data.predicted_depth_m ?? data.depth_m ?? null;
+      const discharge = data.predicted_discharge_lps ?? data.discharge_lps ?? null;
+      const quality = data.predicted_quality_index ?? data.quality_index ?? null;
+
+      let html = `<div><strong>Suitability:</strong> ${cls==1 ? '<span class="text-success">Likely Suitable</span>' : '<span class="text-danger">Not Suitable</span>'}</div>`;
+      if (prob !== null) html += `<div class="mt-2"><strong>Probability:</strong> ${(prob*100).toFixed(1)}%</div>`;
+      if (depth !== null) html += `<div class="mt-2"><strong>Predicted Depth (m):</strong> ${depth.toFixed ? depth.toFixed(2) : depth}</div>`;
+      if (discharge !== null) html += `<div class="mt-2"><strong>Predicted Discharge (lps):</strong> ${discharge.toFixed ? discharge.toFixed(2) : discharge}</div>`;
+      if (quality !== null) html += `<div class="mt-2"><strong>Quality Index:</strong> ${quality}</div>`;
+
+      document.getElementById("result-area").innerHTML = html;
+      document.getElementById("raw").textContent = JSON.stringify(data, null, 2);
+
+    } catch (err) {
+      console.error(err);
+      alert("Prediction failed: " + err.message + "\nCheck console for details.");
+    }
+  });
+</script>
+</body>
+</html>
